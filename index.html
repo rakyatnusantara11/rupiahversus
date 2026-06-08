@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#060612">
+  <meta property="og:title" content="RUPIAH VS DOLLAR: THE FINAL BOSS">
+  <meta property="og:description" content="Defend the Rupiah! Survive 6 waves. Defeat The Fed! 🇮🇩">
+  <title>RUPIAH VS DOLLAR: THE FINAL BOSS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Bangers&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div id="screenFlash"></div>
+
+  <div id="uiLayer">
+
+    <!-- HUD -->
+    <div class="hud hidden" id="hud">
+      <div class="hud-left">
+        <div class="rate-display" id="rateDisplay">Rp <span id="rateValue">15,800</span></div>
+        <div class="wave-info">WAVE <span id="waveNum">1</span>/6</div>
+      </div>
+      <div class="hud-center">
+        <div id="comboDisplay" class="combo-display hidden"></div>
+      </div>
+      <div class="hud-right">
+        <div class="stat-group">
+          <div class="stat-label">HP</div>
+          <div class="stat-bar">
+            <div class="hp-fill" id="hpFill"></div>
+            <span class="stat-bar-text" id="hpText">100</span>
+          </div>
+        </div>
+        <div class="stat-group">
+          <div class="stat-label">ENERGY</div>
+          <div class="stat-bar">
+            <div class="energy-fill" id="energyFill"></div>
+          </div>
+        </div>
+        <div class="score-display"><span id="scoreVal">0</span> <span class="pts-label">PTS</span></div>
+      </div>
+    </div>
+
+    <!-- Special Moves -->
+    <div id="specialMoves" class="special-moves hidden">
+      <button class="special-btn mbg" id="btnMbg" onclick="game.activateSpecial('mbg')" title="MBG Shield - 10s Invincibility">
+        <span class="special-icon">🍚</span>
+        <span class="special-name">MBG</span>
+        <div class="cooldown-overlay" id="cdMbg" style="height:0%"></div>
+      </button>
+      <button class="special-btn prabowo" id="btnPrabowo" onclick="game.activateSpecial('prabowo')" title="Prabowo Roar - Freeze Enemies 5s">
+        <span class="special-icon">🦁</span>
+        <span class="special-name">ROAR</span>
+        <div class="cooldown-overlay" id="cdPrabowo" style="height:0%"></div>
+      </button>
+      <button class="special-btn panic" id="btnPanic" onclick="game.activateSpecial('panic')" title="Panic Sell - Nuke All, -50% HP">
+        <span class="special-icon">💥</span>
+        <span class="special-name">PANIC</span>
+        <div class="cooldown-overlay" id="cdPanic" style="height:0%"></div>
+      </button>
+    </div>
+
+    <!-- Touch Controls -->
+    <div class="touch-controls" id="touchControls">
+      <button class="touch-btn" id="btnLeft" aria-label="Move Left">◀</button>
+      <button class="touch-btn shoot-btn" id="btnShoot" aria-label="Shoot">🔥</button>
+      <button class="touch-btn" id="btnRight" aria-label="Move Right">▶</button>
+    </div>
+
+    <!-- Special Overlay -->
+    <div id="specialOverlay" class="special-overlay" style="display:none">
+      <div id="specialText" class="special-text"></div>
+    </div>
+
+    <!-- Boss Warning -->
+    <div id="bossWarning" class="modal hidden boss-warning-modal">
+      <div class="boss-alert-icon">⚠️</div>
+      <div class="modal-title" style="color:#ff2055">BOSS INCOMING!</div>
+      <div class="boss-name">THE FED</div>
+      <p>The Federal Reserve is attacking!<br>Prepare your defenses!</p>
+    </div>
+
+    <!-- Support Button (hidden) -->
+    <div class="support-hidden" id="donateBtn" onclick="showDonateModal()">💚 Support</div>
+
+    <!-- ===== LOADING ===== -->
+    <div id="loadingModal" class="modal hidden">
+      <div class="loading-logo">
+        <div class="loading-coin">Rp</div>
+        <div class="loading-vs">VS</div>
+        <div class="loading-dollar">$</div>
+      </div>
+      <div class="modal-title">LOADING</div>
+      <div class="loading-bar-wrap">
+        <div id="loadingBar"></div>
+        <div class="loading-glow"></div>
+      </div>
+      <p id="loadingText" class="loading-text">Initializing war room...</p>
+    </div>
+
+    <!-- ===== LOGIN MODAL ===== -->
+    <div id="loginModal" class="modal">
+      <div class="login-brand">
+        <div class="brand-title">RUPIAH</div>
+        <div class="brand-vs">VS</div>
+        <div class="brand-enemy">DOLLAR</div>
+      </div>
+      <div class="brand-tagline">THE FINAL BOSS</div>
+      <p class="brand-desc">The Dollar attacks every month.<br>Upgrade your Rupiah. Survive!</p>
+
+      <div class="form-panel">
+        <div class="form-tabs">
+          <button class="form-tab active" id="tabRegister" onclick="switchTab('register')">⚔️ NEW WARRIOR</button>
+          <button class="form-tab" id="tabLogin" onclick="switchTab('login')">🔄 RETURNING</button>
+        </div>
+
+        <div id="registerForm">
+          <div class="form-group">
+            <label for="regName">📛 Warrior Name</label>
+            <input type="text" id="regName" placeholder="Your battle name" maxlength="20" autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="regEmail">📧 Email</label>
+            <input type="email" id="regEmail" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="regWa">📱 WhatsApp</label>
+            <input type="tel" id="regWa" placeholder="+62895..." inputmode="tel">
+            <div class="hint">Format: +62xxxxxxxxxxx</div>
+          </div>
+          <div class="error-msg" id="registerError"></div>
+          <button class="btn btn-primary btn-full" onclick="handleRegister()">⚔️ JOIN THE FIGHT</button>
+        </div>
+
+        <div id="loginOnlyForm" style="display:none">
+          <div class="form-group">
+            <label for="loginEmail">📧 Email</label>
+            <input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email">
+          </div>
+          <div class="error-msg" id="loginError"></div>
+          <button class="btn btn-primary btn-full" onclick="handleLogin()">🎮 ENTER BATTLE</button>
+        </div>
+      </div>
+
+      <div class="login-footer">
+        <div class="security-badge">🔒 Data secured via Google Sheets</div>
+        <button class="wa-room-badge" onclick="openWaRoom()">
+          <span>📲</span> Join WhatsApp Community
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== MAIN MENU ===== -->
+    <div id="mainMenu" class="modal hidden">
+      <div class="menu-scroll">
+        <div class="menu-header">
+          <div class="menu-title-small">RUPIAH VS DOLLAR</div>
+          <div class="player-badge">
+            <span class="player-icon">🏅</span>
+            <span id="playerName">Warrior</span>
+          </div>
+        </div>
+        <p class="menu-desc">💚 Start at Rp 15,800 — Don't let it hit 20,000!<br>Survive 6 waves. Defeat The Fed!</p>
+        <div class="menu-buttons">
+          <button class="btn btn-primary btn-large" onclick="game.start()">⚔️ START BATTLE</button>
+          <button class="btn btn-warning" onclick="showHowToPlay()">📖 HOW TO PLAY</button>
+          <button class="btn btn-secondary" onclick="handleLogout()">🚪 LOGOUT</button>
+        </div>
+        <button class="btn btn-support" onclick="showDonateModal()">💚 SUPPORT PROJECT</button>
+        <div class="leaderboard-panel">
+          <div class="leaderboard-header">🏆 TOP DEFENDERS</div>
+          <div id="leaderboardList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== HOW TO PLAY ===== -->
+    <div id="howToPlay" class="modal hidden">
+      <div class="modal-subtitle">HOW TO SURVIVE</div>
+      <div class="how-grid">
+        <div class="how-card">
+          <div class="how-icon">🎮</div>
+          <h4>CONTROLS</h4>
+          <p>Arrow / WASD to move<br>SPACE / Click to shoot<br>Mobile: tap buttons</p>
+        </div>
+        <div class="how-card">
+          <div class="how-icon">👹</div>
+          <h4>ENEMIES</h4>
+          <p>💵 $1 — Fast & weak<br>💶 $100 — Tough elite<br>🏦 The Fed — BOSS!<br>👻 Speculator — Invisible!</p>
+        </div>
+        <div class="how-card">
+          <div class="how-icon">⚡</div>
+          <h4>UPGRADES</h4>
+          <p>🔫 BI Laser — More damage<br>🛡️ Forex Shield — Less damage<br>☕ Export Army — Auto allies<br>💊 Subsidy Heal — Restore HP</p>
+        </div>
+        <div class="how-card">
+          <div class="how-icon">🔥</div>
+          <h4>SPECIALS</h4>
+          <p>🍚 MBG — 10s invincibility<br>🦁 Roar — Freeze 5s<br>💥 Panic — Nuke all, -50% HP</p>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="hideHowToPlay()">LET'S GO! 🚀</button>
+    </div>
+
+    <!-- ===== UPGRADE SHOP ===== -->
+    <div id="upgradeShop" class="modal hidden">
+      <div class="modal-subtitle">⚡ UPGRADE YOUR RUPIAH</div>
+      <p>Invest Policy Points to strengthen your defenses!</p>
+      <div class="points-display">
+        <span id="shopPoints">0</span> <span class="pts-label">POLICY POINTS</span>
+      </div>
+      <div class="shop-grid">
+        <div class="upgrade-card" id="card-laser" onclick="game.buyUpgrade('laser')">
+          <div class="upgrade-icon">🔫</div>
+          <h3>BI RATE LASER</h3>
+          <p>Damage &amp; fire rate</p>
+          <div class="cost" id="costLaser">500 PTS</div>
+          <div class="upgrade-level" id="lvlLaser">LV 0</div>
+        </div>
+        <div class="upgrade-card" id="card-shield" onclick="game.buyUpgrade('shield')">
+          <div class="upgrade-icon">🛡️</div>
+          <h3>FOREX SHIELD</h3>
+          <p>Reduce damage taken</p>
+          <div class="cost" id="costShield">500 PTS</div>
+          <div class="upgrade-level" id="lvlShield">LV 0</div>
+        </div>
+        <div class="upgrade-card" id="card-export" onclick="game.buyUpgrade('export')">
+          <div class="upgrade-icon">☕</div>
+          <h3>EXPORT ARMY</h3>
+          <p>Coffee &amp; CPO allies</p>
+          <div class="cost" id="costExport">800 PTS</div>
+          <div class="upgrade-level" id="lvlExport">LV 0</div>
+        </div>
+        <div class="upgrade-card" id="card-subsidy" onclick="game.buyUpgrade('subsidy')">
+          <div class="upgrade-icon">💊</div>
+          <h3>SUBSIDY HEAL</h3>
+          <p>Restore HP (costs energy)</p>
+          <div class="cost" id="costSubsidy">300 PTS</div>
+          <div class="upgrade-level" id="lvlSubsidy">LV 0</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-large" onclick="game.nextWave()">NEXT WAVE →</button>
+    </div>
+
+    <!-- ===== END SCREEN ===== -->
+    <div id="endScreen" class="modal hidden">
+      <div class="end-card" id="shareScreen">
+        <div id="endTitle" class="end-title"></div>
+        <div class="end-rate-label">Exchange Rate reached:</div>
+        <div class="end-rate" id="endRate"></div>
+        <div class="end-result" id="endResult"></div>
+        <div class="end-meme" id="endMeme"></div>
+        <div class="end-stats">
+          Score: <span id="endScore" class="stat-value"></span>
+          &nbsp;|&nbsp;
+          Waves: <span id="endWaves" class="stat-value"></span>
+        </div>
+        <div class="tag-line">Tag <span class="tag-handle">@gochandra11</span> to share!</div>
+        <div class="social-buttons">
+          <button class="social-btn wa-btn" onclick="shareWhatsApp()">📲 WhatsApp</button>
+          <button class="social-btn ig-btn" onclick="shareInstagram()">📸 Instagram</button>
+          <button class="social-btn tt-btn" onclick="shareTikTok()">🎵 TikTok</button>
+        </div>
+        <div class="end-actions">
+          <button class="btn btn-primary" onclick="game.restart()">🔄 PLAY AGAIN</button>
+          <button class="btn btn-support" onclick="showDonateModal()">💚 Support</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DONATE MODAL ===== -->
+    <div id="donateModal" class="modal hidden">
+      <div class="modal-subtitle">💚 SUPPORT THIS PROJECT</div>
+      <p>Built with ❤️ for Indonesia.<br>Keep the Rupiah strong!</p>
+      <div class="donate-options">
+        <a class="donate-card" href="https://trakteer.id" target="_blank" rel="noopener">
+          <div class="donate-icon">☕</div>
+          <div>Trakteer</div>
+        </a>
+        <a class="donate-card" href="https://saweria.co" target="_blank" rel="noopener">
+          <div class="donate-icon">💰</div>
+          <div>Saweria</div>
+        </a>
+      </div>
+      <p style="font-size:12px;color:#555;margin-top:8px;">@gochandra11</p>
+      <button class="btn btn-secondary" onclick="hideDonateModal()">Close</button>
+    </div>
+
+  </div><!-- /uiLayer -->
+</div><!-- /gameContainer -->
+
+<script src="game.js"></script>
+</body>
+</html>

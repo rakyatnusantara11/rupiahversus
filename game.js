@@ -1,15 +1,14 @@
 // =============================================
-//  RUPIAH VS DOLLAR — game.js
+//  RUPIAH VS DOLLAR — game.js (REMASTERED)
 //  Author: @gochandra11
+//  Role: Game Designer, Viral Engineer, Psychologist
 // =============================================
 
 'use strict';
 
 /* ===== CONFIG ===== */
 const CONFIG = {
-  // 🔧 PASTE YOUR GOOGLE APPS SCRIPT URL HERE:
   GOOGLE_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzJa_GB_lGISHEvhu3C_fJTx5cB6Al0xavzk_OQ42hPC490HzxFmxD6Bazx1vLVM9SQmA/exec',
-
   WA_ROOM: 'https://chat.whatsapp.com/C8K3sre2X8k8Sv2QkDTCmX',
 
   START_RATE: 15800,
@@ -19,19 +18,57 @@ const CONFIG = {
   PLAYER_SPEED: 5,
   BULLET_SPEED: 10,
   ENEMY_SPEED_BASE: 1.2,
-  SPAWN_RATE_BASE: 80,
-  BOSS_WAVE: 6,
-  WAVE_ENEMIES: [8, 12, 16, 20, 24, 1],
+  SPAWN_RATE_BASE: 60,
+  TOTAL_WAVES: 10,
+  CRIT_CHANCE: 0.12,
 
-  SPECIAL_COOLDOWNS: { mbg: 18000, prabowo: 15000, panic: 25000 },
+  SPECIAL_COOLDOWNS: { bailout: 18000, hawkish: 15000, devalue: 25000 },
+
+  WAVES: [
+    { total: 12, spawnRate: 55, types: { minion: 1 }, subtitle: 'The Dollar Attacks' },
+    { total: 18, spawnRate: 50, types: { minion: 0.85, elite: 0.15 }, subtitle: 'Elite Forces Incoming' },
+    { total: 22, spawnRate: 48, types: { minion: 0.75, elite: 0.15, speculator: 0.10 }, subtitle: 'Invisible Speculators!' },
+    { total: 28, spawnRate: 45, types: { minion: 0.65, elite: 0.25, speculator: 0.10 }, subtitle: 'Heavy Pressure' },
+    { total: 20, spawnRate: 42, types: { minion: 0.60, elite: 0.20, speculator: 0.10, trump: 0.10 }, subtitle: 'TRUMP ALERT!', isTrumpWave: true },
+    { total: 32, spawnRate: 40, types: { minion: 0.55, elite: 0.25, speculator: 0.20 }, subtitle: 'No Mercy' },
+    { total: 38, spawnRate: 38, types: { minion: 0.50, elite: 0.25, speculator: 0.15, trump: 0.10 }, subtitle: 'Trump Returns' },
+    { total: 42, spawnRate: 35, types: { minion: 0.45, elite: 0.30, speculator: 0.15, trump: 0.10 }, subtitle: 'Market Crash Imminent' },
+    { total: 50, spawnRate: 32, types: { minion: 0.40, elite: 0.30, speculator: 0.20, trump: 0.10 }, subtitle: 'Final Push' },
+    { total: 1,  spawnRate: 999, types: { boss: 1 }, subtitle: 'THE FINAL BOSS', isBossWave: true }
+  ],
 
   LOADING_MESSAGES: [
     'Arming BI Rate Lasers...',
     'Recruiting Export Army...',
-    'Briefing Rupiah troops...',
-    'Preparing war room...',
+    'Analyzing Trump tweets...',
+    'Printing Rupiah...',
     'Ready to defend! 🇮🇩'
-  ]
+  ],
+
+  DEFEAT_MEMES: [
+    '"The printer goes brrr... and your Rupiah goes 😭"',
+    '"You\'re fired! — by the market"',
+    '"Inflation is transitory, they said..."',
+    '"Stack gold? Wrong chain, bro."',
+    '"Jerome Powell sends his regards."'
+  ],
+
+  VICTORY_MEMES: [
+    '"Rupiah strong! The Fed is defeated!"',
+    '"Not today, Jerome Powell!"',
+    '"Money printer jammed. Rupiah wins."',
+    '"Absolute cinema. 🇮🇩"',
+    '"Dollar maxis in shambles."'
+  ],
+
+  KILL_STREAKS: {
+    3: 'DOUBLE KILL!',
+    4: 'TRIPLE KILL!',
+    5: 'RAMPAGE!',
+    6: 'UNSTOPPABLE!',
+    7: 'LEGENDARY!',
+    8: 'GODLIKE!'
+  }
 };
 
 function hasBackend() {
@@ -91,12 +128,16 @@ class AudioEngine {
   bossWarning() {
     for (let i = 0; i < 3; i++) setTimeout(() => this._play(200, 0.28, 'sawtooth', 0.25), i * 280);
   }
+  crit() {
+    this._play(1200, 0.1, 'square', 0.15);
+    setTimeout(() => this._play(1800, 0.15, 'sine', 0.12), 50);
+  }
   special(type) {
-    if (type === 'mbg') {
+    if (type === 'bailout') {
       [440, 554, 659].forEach((f, i) => setTimeout(() => this._play(f, 0.2, 'sine', 0.12), i * 180));
-    } else if (type === 'prabowo') {
+    } else if (type === 'hawkish') {
       for (let i = 0; i < 5; i++) setTimeout(() => this._play(150 + i * 50, 0.25, 'square', 0.18), i * 90);
-    } else if (type === 'panic') {
+    } else if (type === 'devalue') {
       this._play(800, 0.1, 'sawtooth', 0.25); this._play(400, 0.7, 'sawtooth', 0.2);
     }
   }
@@ -122,18 +163,23 @@ class Particle {
 
 /* ===== BULLET ===== */
 class Bullet {
-  constructor(x, y, damage = 1, isLaser = false) {
-    this.x = x; this.y = y; this.damage = damage; this.isLaser = isLaser;
+  constructor(x, y, damage = 1, isLaser = false, isCrit = false) {
+    this.x = x; this.y = y; this.damage = damage; this.isLaser = isLaser; this.isCrit = isCrit;
     this.width = isLaser ? 3 : 5; this.height = isLaser ? 24 : 13;
     this.speed = isLaser ? 13 : CONFIG.BULLET_SPEED;
-    this.color = isLaser ? '#00ff88' : '#ffc107'; this.active = true;
+    this.color = isCrit ? '#c77dff' : (isLaser ? '#00ff88' : '#ffc107');
+    this.active = true;
   }
   update() { this.y -= this.speed; if (this.y < -20) this.active = false; }
   draw(ctx) {
     ctx.fillStyle = this.color;
-    ctx.shadowBlur = this.isLaser ? 12 : 7;
+    ctx.shadowBlur = this.isCrit ? 16 : (this.isLaser ? 12 : 7);
     ctx.shadowColor = this.color;
-    ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+    if (this.isCrit) {
+      ctx.fillRect(this.x - this.width, this.y, this.width * 2, this.height);
+    } else {
+      ctx.fillRect(this.x - this.width / 2, this.y, this.width, this.height);
+    }
     ctx.shadowBlur = 0;
   }
 }
@@ -168,24 +214,28 @@ class StarField {
 class Enemy {
   constructor(type, wave, gx, gy) {
     this.type = type;
-    this.x = Math.random() * (gx - 60) + 30;
-    this.y = -50; this.active = true; this.flash = 0; this.frozen = false;
-    const wm = 1 + (wave * 0.18);
+    this.x = Math.random() * (gx - 80) + 40;
+    this.y = -60; this.active = true; this.flash = 0; this.frozen = false;
+    const wm = 1 + (wave * 0.12);
     switch (type) {
       case 'minion':
         this.hp = this.maxHp = 1 * wm; this.speed = CONFIG.ENEMY_SPEED_BASE * (1 + Math.random() * 0.5);
-        this.damage = 50; this.score = 100; this.width = 44; this.height = 27; this.color = '#85bb65'; break;
+        this.damage = 50; this.score = 100; this.width = 44; this.height = 28; this.color = '#85bb65'; break;
       case 'elite':
         this.hp = this.maxHp = 5 * wm; this.speed = CONFIG.ENEMY_SPEED_BASE * 0.75;
         this.damage = 150; this.score = 300; this.width = 54; this.height = 34; this.color = '#2e7d32'; break;
       case 'boss':
-        this.hp = this.maxHp = 100 * wm; this.speed = 0.45;
-        this.damage = 500; this.score = 5000; this.width = 120; this.height = 100;
+        this.hp = this.maxHp = 120 * wm; this.speed = 0.45;
+        this.damage = 500; this.score = 10000; this.width = 120; this.height = 100;
         this.color = '#ff2055'; this.y = -130; this.attackTimer = 0; break;
       case 'speculator':
         this.hp = this.maxHp = 3 * wm; this.speed = CONFIG.ENEMY_SPEED_BASE * 1.6;
         this.damage = 200; this.score = 500; this.width = 36; this.height = 36;
         this.color = '#c77dff'; this.invisible = true; this.visibleTimer = 0; break;
+      case 'trump':
+        this.hp = this.maxHp = 25 * wm; this.speed = CONFIG.ENEMY_SPEED_BASE * 0.9;
+        this.damage = 300; this.score = 1500; this.width = 48; this.height = 56;
+        this.color = '#ff6f00'; this.attackTimer = 0; break;
     }
   }
   update(game) {
@@ -197,46 +247,75 @@ class Enemy {
       if (this.attackTimer > 180) { this.attackTimer = 0; game.bossAttack(); }
       this.x += Math.sin(Date.now() / 900) * 2.2;
     }
+    if (this.type === 'trump') {
+      this.attackTimer++;
+      if (this.attackTimer > 120) {
+        this.attackTimer = 0;
+        // Trump tweets (spawns a minion)
+        if (game.enemies.filter(e => e.active).length < 15) {
+          game.enemies.push(new Enemy('minion', game.wave, game.canvas.width, game.canvas.height));
+        }
+      }
+      this.x += Math.sin(Date.now() / 600) * 1.5;
+    }
     if (this.type === 'speculator') {
       this.visibleTimer++;
       if (this.visibleTimer > 100) { this.invisible = !this.invisible; this.visibleTimer = 0; }
     }
     if (this.y > game.canvas.height + 60) {
-      this.active = false; game.damageRate(this.damage);
+      this.active = false;
+      game.enemiesEscaped++;
+      game.damageRate(this.damage);
     }
   }
   draw(ctx) {
-    const alpha = this.type === 'speculator' && this.invisible ? 0.22 : 1;
+    const alpha = (this.type === 'speculator' && this.invisible) ? 0.22 : 1;
     const flashAlpha = this.flash > 0 ? Math.min(alpha, 0.45) : alpha;
     ctx.globalAlpha = flashAlpha;
     ctx.save(); ctx.translate(this.x, this.y);
 
     if (this.type === 'minion') {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      this._roundRect(ctx, -22, -14, 44, 28, 4);
+      // $1 Bill body
+      ctx.fillStyle = '#85bb65';
+      this._roundRect(ctx, -22, -14, 44, 28, 2);
       ctx.fill();
-      ctx.strokeStyle = '#a0d67a'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); this._roundRect(ctx, -22, -14, 44, 28, 4); ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('$1', 0, 4);
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(-9, -8, 4, 4); ctx.fillRect(5, -8, 4, 4);
-      ctx.beginPath(); ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 1.5;
-      ctx.arc(0, 3, 5, 0, Math.PI); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      this._roundRect(ctx, -22, -14, 44, 28, 2); ctx.stroke();
+      // Inner
+      ctx.fillStyle = '#a0d67a';
+      this._roundRect(ctx, -18, -10, 36, 20, 1); ctx.fill();
+      // Portrait oval
+      ctx.fillStyle = '#5a8c3a';
+      ctx.beginPath(); ctx.ellipse(0, -2, 7, 9, 0, 0, Math.PI*2); ctx.fill();
+      // "1"
+      ctx.fillStyle = '#2d5a1e'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('1', 0, 2);
+      // Eyes
+      ctx.fillStyle = '#1a3d0f';
+      ctx.beginPath(); ctx.arc(-6, -6, 2, 0, Math.PI*2); ctx.arc(6, -6, 2, 0, Math.PI*2); ctx.fill();
+      // Mouth
+      ctx.beginPath(); ctx.strokeStyle = '#1a3d0f'; ctx.lineWidth = 1;
+      ctx.arc(0, 2, 4, 0, Math.PI); ctx.stroke();
 
     } else if (this.type === 'elite') {
-      ctx.fillStyle = this.color;
-      ctx.beginPath(); this._roundRect(ctx, -27, -17, 54, 34, 5); ctx.fill();
-      ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 2;
-      ctx.beginPath(); this._roundRect(ctx, -27, -17, 54, 34, 5); ctx.stroke();
-      ctx.fillStyle = '#ffd700'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('$100', 0, 4);
-      ctx.fillStyle = 'rgba(0,0,0,0.7)';
-      ctx.beginPath(); ctx.arc(-9, -5, 3, 0, Math.PI * 2); ctx.arc(9, -5, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(-8, 5); ctx.lineTo(8, 5); ctx.lineTo(0, 11); ctx.closePath(); ctx.fill();
+      // $100 Bill
+      ctx.fillStyle = '#2e7d32';
+      this._roundRect(ctx, -27, -17, 54, 34, 2); ctx.fill();
+      ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 2;
+      this._roundRect(ctx, -27, -17, 54, 34, 2); ctx.stroke();
+      // "100"
+      ctx.fillStyle = '#ffd700'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('100', 0, 2);
+      // Sunglasses
+      ctx.fillStyle = '#111';
+      ctx.fillRect(-14, -8, 12, 6); ctx.fillRect(2, -8, 12, 6);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(-12, -7, 3, 2); ctx.fillRect(4, -7, 3, 2);
 
     } else if (this.type === 'boss') {
       // Body
       ctx.fillStyle = '#1a0505';
-      ctx.beginPath(); this._roundRect(ctx, -62, -52, 124, 104, 8); ctx.fill();
+      this._roundRect(ctx, -62, -52, 124, 104, 8); ctx.fill();
       // Face glow
       ctx.fillStyle = this.color; ctx.shadowBlur = 24; ctx.shadowColor = this.color;
       ctx.beginPath(); ctx.arc(0, -8, 44, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
@@ -259,12 +338,43 @@ class Enemy {
       const hp = this.hp / this.maxHp;
       ctx.fillStyle = '#222'; this._roundRect(ctx, -54, -76, 108, 10, 4); ctx.fill();
       ctx.fillStyle = hp > 0.5 ? '#00ff88' : hp > 0.25 ? '#ffc107' : '#ff2055';
-      ctx.beginPath(); this._roundRect(ctx, -54, -76, 108 * hp, 10, 4); ctx.fill();
+      this._roundRect(ctx, -54, -76, 108 * hp, 10, 4); ctx.fill();
 
     } else if (this.type === 'speculator') {
       ctx.fillStyle = this.color; ctx.shadowBlur = 14; ctx.shadowColor = this.color;
       ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
       ctx.font = '16px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('👻', 0, 5);
+
+    } else if (this.type === 'trump') {
+      // 8-bit Trump
+      // Suit body
+      ctx.fillStyle = '#1a3a5c';
+      ctx.fillRect(-20, -10, 40, 35);
+      // Red tie
+      ctx.fillStyle = '#ff0000';
+      ctx.beginPath(); ctx.moveTo(-4, 0); ctx.lineTo(4, 0); ctx.lineTo(0, 18); ctx.fill();
+      // White shirt
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(-8, -5, 16, 12);
+      // Head
+      ctx.fillStyle = '#ffdbac';
+      ctx.fillRect(-14, -28, 28, 20);
+      // Orange hair (8-bit blocks)
+      ctx.fillStyle = '#ff6f00';
+      ctx.fillRect(-16, -32, 32, 6);
+      ctx.fillRect(-16, -28, 6, 8);
+      ctx.fillRect(10, -28, 6, 8);
+      ctx.fillRect(-12, -34, 8, 4);
+      ctx.fillRect(4, -34, 8, 4);
+      // Eyes
+      ctx.fillStyle = '#fff'; ctx.fillRect(-8, -22, 6, 5); ctx.fillRect(2, -22, 6, 5);
+      ctx.fillStyle = '#000'; ctx.fillRect(-6, -21, 2, 3); ctx.fillRect(4, -21, 2, 3);
+      // Mouth
+      ctx.strokeStyle = '#c47e5e'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-4, -14); ctx.lineTo(4, -14); ctx.stroke();
+      // Label
+      ctx.fillStyle = '#ff6f00'; ctx.font = 'bold 10px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('TRUMP', 0, 32);
     }
 
     ctx.restore(); ctx.globalAlpha = 1;
@@ -276,13 +386,16 @@ class Enemy {
     ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
     ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r); ctx.closePath();
   }
-  takeDamage(dmg, game) {
+  takeDamage(dmg, game, isCrit = false) {
     this.hp -= dmg; this.flash = 6;
     if (this.hp <= 0) {
       this.active = false;
       game.addScore(this.score);
       game.addParticles(this.x, this.y, this.color, 14);
       game.audio.explode();
+      game.killStreak++;
+      game.killStreakTimer = 180;
+      game._checkKillStreak();
       return true;
     }
     return false;
@@ -329,22 +442,30 @@ class Game {
     this.setupInput();
     this._boundLoop = this._loop.bind(this);
     requestAnimationFrame(this._boundLoop);
+
+    // Fake live counter
+    this._liveCounterTimer = 0;
   }
 
   _reset() {
     this.bullets = []; this.enemies = []; this.allies = []; this.particles = [];
     this.rate = CONFIG.START_RATE; this.score = 0; this.wave = 1;
-    this.enemiesKilled = 0; this.enemiesSpawned = 0; this.spawnTimer = 0;
+    this.enemiesKilled = 0; this.enemiesSpawned = 0; this.enemiesEscaped = 0;
+    this.spawnTimer = 0;
     this.energy = CONFIG.MAX_ENERGY; this.player.hp = CONFIG.MAX_HP;
     this.upgrades = { laser: 0, shield: 0, export: 0, subsidy: 0 };
     this.points = 0;
-    this.specialCooldowns = { mbg: 0, prabowo: 0, panic: 0 };
-    this.specialActive = { mbg: false, prabowo: false };
-    this.specialTimers = { mbg: 0, prabowo: 0 };
+    this.specialCooldowns = { bailout: 0, hawkish: 0, devalue: 0 };
+    this.specialActive = { bailout: false, hawkish: false };
+    this.specialTimers = { bailout: 0, hawkish: 0 };
     this.shootTimer = 0;
     this.invincible = false;
     this.bossWarningShown = false;
     this.combo = 0; this.comboTimer = 0;
+    this.killStreak = 0; this.killStreakTimer = 0;
+    this.waveState = 'idle'; // idle, spawning, active, cleared, intermission
+    this.currentWaveConfig = null;
+    this.currentSpawnRate = CONFIG.SPAWN_RATE_BASE;
   }
 
   resize() {
@@ -383,7 +504,6 @@ class Game {
     });
     window.addEventListener('resize', () => this.resize());
 
-    // Touch anywhere = resume AudioContext
     document.addEventListener('touchstart', () => this.audio.resume(), { once: true });
   }
 
@@ -391,23 +511,51 @@ class Game {
     if (this.state !== 'playing') return;
     const dmg = 1 + this.upgrades.laser;
     const isLaser = this.upgrades.laser >= 3;
-    this.bullets.push(new Bullet(this.player.x, this.player.y - 22, dmg, isLaser));
+    const isCrit = Math.random() < CONFIG.CRIT_CHANCE;
+    const finalDmg = isCrit ? dmg * 2 : dmg;
+    
+    this.bullets.push(new Bullet(this.player.x, this.player.y - 22, finalDmg, isLaser, isCrit));
     if (this.upgrades.laser >= 2) {
-      this.bullets.push(new Bullet(this.player.x - 16, this.player.y - 12, dmg, isLaser));
-      this.bullets.push(new Bullet(this.player.x + 16, this.player.y - 12, dmg, isLaser));
+      this.bullets.push(new Bullet(this.player.x - 16, this.player.y - 12, finalDmg, isLaser, isCrit));
+      this.bullets.push(new Bullet(this.player.x + 16, this.player.y - 12, finalDmg, isLaser, isCrit));
     }
     this.audio.shoot();
+    if (isCrit) this.audio.crit();
   }
 
   start() {
     this._reset();
     this.state = 'playing';
-    this._show('hud'); this._show('specialMoves');
+    this._show('hud'); this._show('specialMoves'); this._show('liveCounter');
     this._hide('mainMenu');
     if (window.innerWidth < 600 || window.innerHeight < 500)
       document.getElementById('touchControls').style.display = 'flex';
     this.audio.resume();
-    this.audio.bossWarning();
+    this._startWave(1);
+  }
+
+  _startWave(waveNum) {
+    this.wave = waveNum;
+    this.enemiesKilled = 0; this.enemiesSpawned = 0; this.enemiesEscaped = 0;
+    this.waveState = 'spawning';
+    this.currentWaveConfig = CONFIG.WAVES[Math.min(waveNum - 1, CONFIG.WAVES.length - 1)];
+    this.currentSpawnRate = this.currentWaveConfig.spawnRate;
+    this.bossWarningShown = false;
+
+    // Show wave banner
+    const banner = document.getElementById('waveBanner');
+    const title = document.getElementById('waveBannerTitle');
+    const sub = document.getElementById('waveBannerSubtitle');
+    title.textContent = `WAVE ${waveNum}`;
+    sub.textContent = this.currentWaveConfig.subtitle || '';
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 2500);
+
+    if (this.currentWaveConfig.isBossWave) {
+      this._showBossWarning('THE FED', 'The Federal Reserve is attacking!<br>Prepare your defenses!');
+    } else if (this.currentWaveConfig.isTrumpWave) {
+      this._showBossWarning('TRUMP', '8-bit Mini-Boss incoming!<br>He tweets minions into existence!');
+    }
   }
 
   restart() { this._hide('endScreen'); this.showMenu(); }
@@ -415,7 +563,7 @@ class Game {
   showMenu() {
     this.state = 'menu';
     this._show('mainMenu');
-    this._hide('hud'); this._hide('specialMoves');
+    this._hide('hud'); this._hide('specialMoves'); this._hide('liveCounter');
     document.getElementById('touchControls').style.display = 'none';
     this.loadLeaderboard();
   }
@@ -423,27 +571,46 @@ class Game {
   _show(id) { document.getElementById(id).classList.remove('hidden'); }
   _hide(id) { document.getElementById(id).classList.add('hidden'); }
 
-  // ===== SPAWN =====
+  /* ===== SPAWN SYSTEM (BUG FIX) ===== */
   _spawnEnemy() {
-    if (this.wave === CONFIG.BOSS_WAVE && !this.bossWarningShown) {
-      this.bossWarningShown = true; this._showBossWarning(); return;
+    const cfg = this.currentWaveConfig;
+    if (!cfg) return;
+
+    if (cfg.isBossWave && !this.bossWarningShown) {
+      // Wait for boss warning to finish
+      return;
     }
+
     let type = 'minion';
     const r = Math.random();
-    if (this.wave === CONFIG.BOSS_WAVE && this.enemiesSpawned === 0) type = 'boss';
-    else if (r < 0.06 && this.wave > 2) type = 'speculator';
-    else if (r < 0.22 + this.wave * 0.05 && this.wave > 1) type = 'elite';
+    let cumulative = 0;
+    
+    if (cfg.isBossWave) {
+      type = 'boss';
+    } else {
+      const types = Object.keys(cfg.types);
+      for (const t of types) {
+        cumulative += cfg.types[t];
+        if (r <= cumulative) { type = t; break; }
+      }
+    }
+
     this.enemies.push(new Enemy(type, this.wave, this.canvas.width, this.canvas.height));
     this.enemiesSpawned++;
   }
 
-  _showBossWarning() {
+  _showBossWarning(name, desc) {
+    this.bossWarningShown = true;
+    document.getElementById('bossName').textContent = name;
+    document.getElementById('bossDesc').innerHTML = desc;
     this._show('bossWarning');
     this.audio.bossWarning();
     setTimeout(() => {
       this._hide('bossWarning');
-      this.enemies.push(new Enemy('boss', this.wave, this.canvas.width, this.canvas.height));
-      this.enemiesSpawned++;
+      if (this.currentWaveConfig.isBossWave) {
+        this.enemies.push(new Enemy('boss', this.wave, this.canvas.width, this.canvas.height));
+        this.enemiesSpawned++;
+      }
     }, 3000);
   }
 
@@ -458,7 +625,7 @@ class Game {
   }
 
   damageRate(amount) {
-    if (this.invincible || this.specialActive.mbg) return;
+    if (this.invincible || this.specialActive.bailout) return;
     const reduction = this.upgrades.shield * 0.15;
     const actual = Math.max(0, Math.floor(amount * (1 - reduction)));
     this.rate += actual;
@@ -493,25 +660,42 @@ class Game {
     setTimeout(() => el.remove(), 900);
   }
 
+  _checkKillStreak() {
+    const msgs = CONFIG.KILL_STREAKS;
+    const streak = this.killStreak;
+    if (msgs[streak]) {
+      const el = document.getElementById('killStreakDisplay');
+      el.textContent = msgs[streak];
+      el.classList.remove('hidden');
+      // Force reflow
+      void el.offsetWidth;
+      el.classList.add('hidden');
+      // Actually show it by removing hidden again after a tick? No, CSS animation handles it
+      // The animation runs when not hidden, so we need to manage class properly
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 1500);
+    }
+  }
+
   activateSpecial(type) {
     if (this.state !== 'playing') return;
     const now = Date.now();
-    if (type === 'mbg') {
-      if (now - this.specialCooldowns.mbg < CONFIG.SPECIAL_COOLDOWNS.mbg) return;
-      this.specialCooldowns.mbg = now; this.specialActive.mbg = true; this.specialTimers.mbg = 10000;
-      this._showSpecialOverlay('🍚 MBG SHIELD!', '#00ff88'); this.audio.special('mbg');
-      this._floatText(this.canvas.width / 2, this.canvas.height / 3, 'RAKYAT HAPPY!', '#00ff88');
+    if (type === 'bailout') {
+      if (now - this.specialCooldowns.bailout < CONFIG.SPECIAL_COOLDOWNS.bailout) return;
+      this.specialCooldowns.bailout = now; this.specialActive.bailout = true; this.specialTimers.bailout = 10000;
+      this._showSpecialOverlay('🛡️ BAILOUT!', '#00ff88'); this.audio.special('bailout');
+      this._floatText(this.canvas.width / 2, this.canvas.height / 3, 'TOO BIG TO FAIL!', '#00ff88');
 
-    } else if (type === 'prabowo') {
-      if (now - this.specialCooldowns.prabowo < CONFIG.SPECIAL_COOLDOWNS.prabowo) return;
-      this.specialCooldowns.prabowo = now; this.specialActive.prabowo = true; this.specialTimers.prabowo = 5000;
-      this._showSpecialOverlay('🦁 SWASEMBADA!', '#ff8c00'); this.audio.special('prabowo');
+    } else if (type === 'hawkish') {
+      if (now - this.specialCooldowns.hawkish < CONFIG.SPECIAL_COOLDOWNS.hawkish) return;
+      this.specialCooldowns.hawkish = now; this.specialActive.hawkish = true; this.specialTimers.hawkish = 5000;
+      this._showSpecialOverlay('❄️ HAWKISH!', '#00cfff'); this.audio.special('hawkish');
       this.enemies.forEach(e => e.frozen = true);
 
-    } else if (type === 'panic') {
-      if (now - this.specialCooldowns.panic < CONFIG.SPECIAL_COOLDOWNS.panic) return;
-      this.specialCooldowns.panic = now;
-      this._showSpecialOverlay('💥 PANIC SELL!', '#ff2055'); this.audio.special('panic');
+    } else if (type === 'devalue') {
+      if (now - this.specialCooldowns.devalue < CONFIG.SPECIAL_COOLDOWNS.devalue) return;
+      this.specialCooldowns.devalue = now;
+      this._showSpecialOverlay('💥 DEVALUE!', '#ff2055'); this.audio.special('devalue');
       this.enemies.forEach(e => { this.addParticles(e.x, e.y, e.color, 16); this.addScore(e.score); });
       this.enemies = [];
       this.player.hp = Math.max(1, Math.floor(this.player.hp * 0.5));
@@ -525,7 +709,6 @@ class Game {
     const tx = document.getElementById('specialText');
     tx.textContent = text; tx.style.color = color;
     ov.style.display = 'flex';
-    // force reflow for animation restart
     ov.classList.remove('active');
     void ov.offsetHeight;
     setTimeout(() => { ov.style.display = 'none'; }, 2000);
@@ -533,7 +716,7 @@ class Game {
 
   _updateSpecialUI() {
     const now = Date.now();
-    ['mbg', 'prabowo', 'panic'].forEach(t => {
+    ['bailout', 'hawkish', 'devalue'].forEach(t => {
       const elapsed = now - this.specialCooldowns[t];
       const pct = Math.max(0, Math.min(100, (elapsed / CONFIG.SPECIAL_COOLDOWNS[t]) * 100));
       const id = 'cd' + t[0].toUpperCase() + t.slice(1);
@@ -556,7 +739,6 @@ class Game {
         this.energy = Math.max(0, this.energy - 20);
       }
       this._updateShopUI();
-      // Flash card
       const card = document.getElementById('card-' + type);
       if (card) { card.style.borderColor = '#00ff88'; setTimeout(() => card.style.borderColor = '', 600); }
     }
@@ -574,13 +756,16 @@ class Game {
   }
 
   nextWave() {
-    this.wave++; this.enemiesKilled = 0; this.enemiesSpawned = 0;
-    this.state = 'playing';
+    if (this.wave >= CONFIG.TOTAL_WAVES) {
+      this._victory();
+      return;
+    }
     this._hide('upgradeShop');
-    if (this.wave > CONFIG.BOSS_WAVE) this._victory();
+    this._startWave(this.wave + 1);
   }
 
   _showUpgradeShop() {
+    this.waveState = 'intermission';
     this.state = 'shop';
     this._updateShopUI();
     this._show('upgradeShop');
@@ -588,7 +773,7 @@ class Game {
 
   gameOver(victory) {
     this.state = victory ? 'victory' : 'gameover';
-    this._hide('hud'); this._hide('specialMoves');
+    this._hide('hud'); this._hide('specialMoves'); this._hide('liveCounter');
     document.getElementById('touchControls').style.display = 'none';
     this._show('endScreen');
 
@@ -602,16 +787,16 @@ class Game {
       endTitle.textContent = '🏆 VICTORY!'; endTitle.style.color = '#00ff88';
       endRate.textContent = 'Rp ' + this.rate.toLocaleString(); endRate.style.color = '#00ff88';
       endResult.textContent = 'RUPIAH SURVIVED! 🇮🇩'; endResult.style.color = '#00ff88';
-      endMeme.textContent = '"Rupiah Strong! The Fed is defeated! Bank Indonesia menang!"';
+      const memes = CONFIG.VICTORY_MEMES;
+      endMeme.textContent = memes[Math.floor(Math.random() * memes.length)];
       shareScreen.style.borderColor = '#00ff88';
       shareScreen.style.boxShadow = '0 0 50px rgba(0,255,136,0.3)';
     } else {
       endTitle.textContent = '💀 DEFEAT'; endTitle.style.color = '#ff2055';
       endRate.textContent = 'Rp ' + this.rate.toLocaleString(); endRate.style.color = '#ff2055';
       endResult.textContent = 'RUPIAH KO!'; endResult.style.color = '#ff2055';
-      endMeme.textContent = this.rate >= 20000
-        ? '"Rp 20,000... Indonesia Pusaka plays softly... 😭"'
-        : '"The Fed was too strong... Stack gold? 😭"';
+      const memes = CONFIG.DEFEAT_MEMES;
+      endMeme.textContent = memes[Math.floor(Math.random() * memes.length)];
       shareScreen.style.borderColor = '#ff2055';
       shareScreen.style.boxShadow = '0 0 50px rgba(255,32,85,0.3)';
     }
@@ -622,96 +807,120 @@ class Game {
 
   _victory() { this.gameOver(true); }
 
-  // ===== MAIN UPDATE =====
+  /* ===== MAIN UPDATE ===== */
   _update() {
-    if (this.state !== 'playing') return;
-    const spd = CONFIG.PLAYER_SPEED;
+    if (this.state === 'playing') {
+      const spd = CONFIG.PLAYER_SPEED;
 
-    if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) this.player.x -= spd;
-    if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) this.player.x += spd;
-    if (this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) this.player.y -= spd;
-    if (this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) this.player.y += spd;
+      if (this.keys['ArrowLeft'] || this.keys['a'] || this.keys['A']) this.player.x -= spd;
+      if (this.keys['ArrowRight'] || this.keys['d'] || this.keys['D']) this.player.x += spd;
+      if (this.keys['ArrowUp'] || this.keys['w'] || this.keys['W']) this.player.y -= spd;
+      if (this.keys['ArrowDown'] || this.keys['s'] || this.keys['S']) this.player.y += spd;
 
-    this.player.x = Math.max(28, Math.min(this.canvas.width - 28, this.player.x));
-    this.player.y = Math.max(55, Math.min(this.canvas.height - 55, this.player.y));
+      this.player.x = Math.max(28, Math.min(this.canvas.width - 28, this.player.x));
+      this.player.y = Math.max(55, Math.min(this.canvas.height - 55, this.player.y));
 
-    // Auto-shoot
-    this.shootTimer++;
-    const fireRate = Math.max(8, 28 - this.upgrades.laser * 5);
-    if (this.shootTimer >= fireRate) { this.shootTimer = 0; this._shoot(); }
+      // Auto-shoot
+      this.shootTimer++;
+      const fireRate = Math.max(8, 28 - this.upgrades.laser * 5);
+      if (this.shootTimer >= fireRate) { this.shootTimer = 0; this._shoot(); }
 
-    // Combo decay
-    if (this.comboTimer > 0) {
-      this.comboTimer--;
-      if (this.comboTimer === 0) {
-        this.combo = 0;
-        document.getElementById('comboDisplay').classList.add('hidden');
-      }
-    }
-
-    // Spawn
-    this.spawnTimer++;
-    const spawnRate = Math.max(18, CONFIG.SPAWN_RATE_BASE - this.wave * 6);
-    const waveTarget = CONFIG.WAVE_ENEMIES[Math.min(this.wave - 1, CONFIG.WAVE_ENEMIES.length - 1)];
-    if (this.spawnTimer >= spawnRate && this.enemiesSpawned < waveTarget) {
-      this.spawnTimer = 0; this._spawnEnemy();
-    }
-
-    // Wave complete
-    if (this.enemiesSpawned >= waveTarget && this.enemies.length === 0 && this.enemiesKilled >= waveTarget)
-      this._showUpgradeShop();
-
-    // Update bullets
-    this.bullets = this.bullets.filter(b => b.active);
-    this.bullets.forEach(b => b.update());
-
-    // Update enemies + collisions
-    this.enemies = this.enemies.filter(e => e.active);
-    this.enemies.forEach(e => {
-      e.update(this);
-      // Enemy vs player
-      if (!this.specialActive.mbg) {
-        const dx = e.x - this.player.x, dy = e.y - this.player.y;
-        if (Math.sqrt(dx * dx + dy * dy) < 32) {
-          this.player.hp -= 8; e.active = false;
-          this.addParticles(e.x, e.y, '#ff2055', 10); this.audio.hit();
-          this._floatText(this.player.x, this.player.y - 40, '-8 HP', '#ff2055');
-          if (this.player.hp <= 0) this.gameOver(false);
+      // Combo decay
+      if (this.comboTimer > 0) {
+        this.comboTimer--;
+        if (this.comboTimer === 0) {
+          this.combo = 0;
+          document.getElementById('comboDisplay').classList.add('hidden');
         }
       }
-      // Bullet vs enemy
-      this.bullets.forEach(b => {
-        if (!b.active || !e.active) return;
-        const bdx = b.x - e.x, bdy = b.y - e.y;
-        if (Math.sqrt(bdx * bdx + bdy * bdy) < 26) {
-          b.active = false;
-          if (e.takeDamage(b.damage, this)) this.enemiesKilled++;
+
+      // Kill streak decay
+      if (this.killStreakTimer > 0) {
+        this.killStreakTimer--;
+        if (this.killStreakTimer <= 0) this.killStreak = 0;
+      }
+
+      // Spawn system
+      if (this.waveState === 'spawning') {
+        this.spawnTimer++;
+        if (this.spawnTimer >= this.currentSpawnRate) {
+          this.spawnTimer = 0;
+          if (this.enemiesSpawned < this.currentWaveConfig.total) {
+            this._spawnEnemy();
+          } else {
+            this.waveState = 'active';
+          }
         }
+      }
+
+      // Check wave complete
+      if (this.waveState === 'active' && this.enemies.length === 0) {
+        this.waveState = 'cleared';
+        setTimeout(() => this._showUpgradeShop(), 500);
+      }
+
+      // Update bullets
+      this.bullets = this.bullets.filter(b => b.active);
+      this.bullets.forEach(b => b.update());
+
+      // Update enemies + collisions
+      this.enemies = this.enemies.filter(e => e.active);
+      this.enemies.forEach(e => {
+        e.update(this);
+        // Enemy vs player
+        if (!this.specialActive.bailout) {
+          const dx = e.x - this.player.x, dy = e.y - this.player.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 32) {
+            this.player.hp -= 8; e.active = false;
+            this.addParticles(e.x, e.y, '#ff2055', 10); this.audio.hit();
+            this._floatText(this.player.x, this.player.y - 40, '-8 HP', '#ff2055');
+            if (this.player.hp <= 0) this.gameOver(false);
+          }
+        }
+        // Bullet vs enemy
+        this.bullets.forEach(b => {
+          if (!b.active || !e.active) return;
+          const bdx = b.x - e.x, bdy = b.y - e.y;
+          const bdist = Math.sqrt(bdx * bdx + bdy * bdy);
+          const hitRadius = e.type === 'boss' ? 40 : 26;
+          if (bdist < hitRadius) {
+            b.active = false;
+            if (b.isCrit) {
+              this._floatText(e.x, e.y - 30, 'CRIT!', '#c77dff');
+            }
+            if (e.takeDamage(b.damage, this, b.isCrit)) this.enemiesKilled++;
+          }
+        });
       });
-    });
 
-    // Update allies
-    this.allies = this.allies.filter(a => a.active);
-    this.allies.forEach(a => a.update(this));
+      // Update allies
+      this.allies = this.allies.filter(a => a.active);
+      this.allies.forEach(a => a.update(this));
 
-    // Particles
-    this.particles = this.particles.filter(p => p.life > 0);
-    this.particles.forEach(p => p.update());
+      // Particles
+      this.particles = this.particles.filter(p => p.life > 0);
+      this.particles.forEach(p => p.update());
 
-    // Specials
-    if (this.specialActive.mbg) { this.specialTimers.mbg -= 16; if (this.specialTimers.mbg <= 0) this.specialActive.mbg = false; }
-    if (this.specialActive.prabowo) {
-      this.specialTimers.prabowo -= 16;
-      if (this.specialTimers.prabowo <= 0) {
-        this.specialActive.prabowo = false;
-        this.enemies.forEach(e => e.frozen = false);
+      // Specials
+      if (this.specialActive.bailout) {
+        this.specialTimers.bailout -= 16;
+        if (this.specialTimers.bailout <= 0) this.specialActive.bailout = false;
       }
-    }
+      if (this.specialActive.hawkish) {
+        this.specialTimers.hawkish -= 16;
+        if (this.specialTimers.hawkish <= 0) {
+          this.specialActive.hawkish = false;
+          this.enemies.forEach(e => e.frozen = false);
+        }
+      }
 
-    this._updateSpecialUI();
-    if (this.screenShake > 0) this.screenShake--;
-    if (this.energy < 100) this.energy += 0.04;
-    this._updateHUD();
+      this._updateSpecialUI();
+      if (this.screenShake > 0) this.screenShake--;
+      if (this.energy < 100) this.energy += 0.04;
+      this._updateHUD();
+      this._updateLiveCounter();
+    }
   }
 
   _updateHUD() {
@@ -726,7 +935,15 @@ class Game {
     document.getElementById('scoreVal').textContent = this.score.toLocaleString();
   }
 
-  // ===== MAIN DRAW =====
+  _updateLiveCounter() {
+    this._liveCounterTimer++;
+    if (this._liveCounterTimer % 300 === 0) { // every ~5 seconds
+      const base = 800 + Math.floor(Math.random() * 700);
+      document.getElementById('liveCounter').textContent = `🔴 ${base.toLocaleString()} warriors online`;
+    }
+  }
+
+  /* ===== MAIN DRAW ===== */
   _draw() {
     const ctx = this.ctx;
     const w = this.canvas.width, h = this.canvas.height;
@@ -778,8 +995,8 @@ class Game {
     const { x, y } = this.player;
     ctx.save(); ctx.translate(x, y);
 
-    // MBG shield ring
-    if (this.specialActive.mbg) {
+    // Bailout shield ring
+    if (this.specialActive.bailout) {
       ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2.5;
       ctx.shadowBlur = 22; ctx.shadowColor = '#00ff88';
       ctx.beginPath(); ctx.arc(0, 0, 44, 0, Math.PI * 2); ctx.stroke();
@@ -827,7 +1044,7 @@ class Game {
     requestAnimationFrame(this._boundLoop);
   }
 
-  // ===== BACKEND =====
+  /* ===== BACKEND ===== */
   async _saveScore() {
     if (!this.user) return;
     const entry = { name: this.user.name, score: this.score, wave: this.wave, rate: this.rate, date: new Date().toISOString() };
@@ -983,15 +1200,15 @@ function showDonateModal() { document.getElementById('donateModal').classList.re
 function hideDonateModal() { document.getElementById('donateModal').classList.add('hidden'); }
 
 function shareWhatsApp() {
-  const text = `🎮 RUPIAH VS DOLLAR!\n\nScore: ${game.score.toLocaleString()} pts\nExchange Rate: Rp ${game.rate.toLocaleString()}\nWave: ${game.wave}\n\nBisa kamu kalahkan The Fed? 🇮🇩\nPlay: https://gochandra11.github.io/rupiah-vs-dollar\n\n@gochandra11 #RupiahVsDollar`;
+  const text = `🎮 RUPIAH VS DOLLAR — THE FINAL BOSS\n\nI scored ${game.score.toLocaleString()} defending the Rupiah!\nRate: Rp ${game.rate.toLocaleString()}\nWave: ${game.wave}/10\n\nCan you beat The Fed and Trump? 🇮🇩\nPlay: https://gochandra11.github.io/rupiah-vs-dollar\n\n@gochandra11 #RupiahVsDollar #IndonesiaGame`;
   window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
 }
 function shareInstagram() {
-  const text = `I scored ${game.score.toLocaleString()} defending the Rupiah! Rate hit Rp ${game.rate.toLocaleString()}. Can you do better?\n\nPlay free at gochandra11.github.io/rupiah-vs-dollar 🇮🇩\n@gochandra11 #RupiahVsDollar #IndonesiaGame #GameIndonesia`;
+  const text = `I scored ${game.score.toLocaleString()} defending the Rupiah against The Fed & Trump! 🟠\nRate hit Rp ${game.rate.toLocaleString()}. Can you do better?\n\nPlay free at gochandra11.github.io/rupiah-vs-dollar 🇮🇩\n@gochandra11 #RupiahVsDollar #IndonesiaGame #GameIndonesia`;
   navigator.clipboard.writeText(text).then(() => alert('Caption copied! Paste in Instagram. Tag @gochandra11!'));
 }
 function shareTikTok() {
-  const text = `Rupiah Challenge! Score ${game.score.toLocaleString()} defending against The Fed! Rp ${game.rate.toLocaleString()}\n\nPlay at gochandra11.github.io/rupiah-vs-dollar\n@gochandra11 #RupiahChallenge #GameIndonesia #IndonesiaBanget`;
+  const text = `Rupiah Challenge! Score ${game.score.toLocaleString()} defending against The Fed & Trump! 🟠\nRate: Rp ${game.rate.toLocaleString()}\n\nPlay at gochandra11.github.io/rupiah-vs-dollar\n@gochandra11 #RupiahChallenge #GameIndonesia #IndonesiaBanget`;
   navigator.clipboard.writeText(text).then(() => alert('Caption copied! Paste in TikTok. Tag @gochandra11!'));
 }
 

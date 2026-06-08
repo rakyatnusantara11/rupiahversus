@@ -1,8 +1,7 @@
 /* =============================================
-   RUPIAH VS DOLLAR — style.css
+   RUPIAH VS DOLLAR — style.css (REMASTERED)
    ============================================= */
 
-/* ===== CUSTOM PROPERTIES ===== */
 :root {
   --green: #00ff88;
   --green-dim: #00cc6e;
@@ -11,6 +10,7 @@
   --gold-dim: #e6a800;
   --blue: #00cfff;
   --purple: #c77dff;
+  --trump: #ff6f00;
   --bg: #04040f;
   --bg-panel: rgba(8, 8, 24, 0.96);
   --border-green: rgba(0, 255, 136, 0.3);
@@ -21,12 +21,10 @@
   --font-impact: 'Bangers', cursive;
 }
 
-/* ===== RESET ===== */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 button { cursor: pointer; border: none; background: none; font-family: var(--font-body); }
 input { font-family: var(--font-body); }
 
-/* ===== BODY ===== */
 body {
   background: var(--bg);
   color: #fff;
@@ -40,20 +38,14 @@ body {
   width: 100vw;
 }
 
-/* Scanline overlay */
 body::after {
   content: '';
   position: fixed; inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent, transparent 3px,
-    rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px
-  );
+  background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.06) 3px, rgba(0,0,0,0.06) 4px);
   pointer-events: none;
   z-index: 9999;
 }
 
-/* ===== GAME CONTAINER ===== */
 #gameContainer {
   position: relative;
   width: 100%; height: 100%;
@@ -61,20 +53,101 @@ body::after {
   max-height: 100dvh;
   background: var(--bg);
   overflow: hidden;
-  box-shadow:
-    0 0 60px rgba(0,255,136,0.15),
-    0 0 120px rgba(0,0,50,0.7),
-    inset 0 0 80px rgba(0,0,20,0.5);
+  box-shadow: 0 0 60px rgba(0,255,136,0.15), 0 0 120px rgba(0,0,50,0.7), inset 0 0 80px rgba(0,0,20,0.5);
 }
 canvas { display: block; width: 100%; height: 100%; }
 
-/* ===== UI LAYER ===== */
 #uiLayer {
   position: absolute; inset: 0;
   pointer-events: none;
   z-index: 10;
 }
 #uiLayer > * { pointer-events: auto; }
+
+/* ===== LIVE COUNTER ===== */
+.live-counter {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,0,0,0.15);
+  border: 1px solid rgba(255,0,0,0.3);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  color: #ff5555;
+  letter-spacing: 1px;
+  z-index: 20;
+  animation: livePulse 2s ease-in-out infinite;
+}
+@keyframes livePulse { 0%,100%{opacity:0.8} 50%{opacity:1} }
+
+/* ===== WAVE BANNER ===== */
+.wave-banner {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  pointer-events: none;
+  z-index: 25;
+  background: rgba(0,0,0,0.3);
+  animation: bannerFade 2.5s ease-out forwards;
+}
+.wave-banner.hidden { display: none !important; }
+.wave-banner-title {
+  font-family: var(--font-impact);
+  font-size: 64px;
+  color: var(--gold);
+  text-shadow: 0 0 40px rgba(255,193,7,0.8);
+  letter-spacing: 4px;
+  animation: bannerPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.wave-banner-subtitle {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 4px;
+  margin-top: 8px;
+  animation: bannerPop 0.6s 0.1s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes bannerPop {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes bannerFade {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ===== KILL STREAK ===== */
+.kill-streak {
+  position: absolute; top: 35%; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-impact);
+  font-size: 42px;
+  color: var(--gold);
+  text-shadow: 0 0 30px rgba(255,193,7,0.9), 0 0 60px rgba(255,32,85,0.5);
+  letter-spacing: 3px;
+  z-index: 25;
+  pointer-events: none;
+  animation: streakPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), streakFade 1.5s 0.5s ease-out forwards;
+}
+@keyframes streakPop { from { transform: translateX(-50%) scale(0.2); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+@keyframes streakFade { to { opacity: 0; transform: translateX(-50%) scale(1.3); } }
+
+/* ===== CRIT DISPLAY ===== */
+.crit-display {
+  position: absolute;
+  font-family: var(--font-impact);
+  font-size: 28px;
+  color: var(--purple);
+  text-shadow: 0 0 20px rgba(199,125,255,0.9);
+  pointer-events: none;
+  z-index: 25;
+  animation: critAnim 0.8s ease-out forwards;
+}
+@keyframes critAnim {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  30% { transform: translateY(-20px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-50px) scale(1); opacity: 0; }
+}
 
 /* ===== HUD ===== */
 .hud {
@@ -85,9 +158,8 @@ canvas { display: block; width: 100%; height: 100%; }
 .hidden { display: none !important; }
 
 .hud-left, .hud-right { display: flex; flex-direction: column; gap: 5px; }
-.hud-center { flex: 1; display: flex; justify-content: center; align-items: flex-start; }
+.hud-center { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; }
 
-/* Rate Display */
 .rate-display {
   background: rgba(0, 0, 0, 0.85);
   padding: 6px 14px; border-radius: 8px;
@@ -112,7 +184,6 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 .wave-info span { color: #fff; }
 
-/* Combo */
 .combo-display {
   background: rgba(255,193,7,0.15);
   border: 1px solid var(--gold);
@@ -122,7 +193,6 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 @keyframes comboPop { from{transform:scale(1.3)} to{transform:scale(1)} }
 
-/* Stat Bars */
 .stat-group { display: flex; flex-direction: column; gap: 2px; }
 .stat-label {
   font-family: var(--font-display); font-size: 7px;
@@ -181,9 +251,9 @@ canvas { display: block; width: 100%; height: 100%; }
   position: absolute; bottom: 0; left: 0; width: 100%;
   background: rgba(0,0,0,0.7); transition: height 0.1s linear;
 }
-.special-btn.mbg { border-color: var(--green); box-shadow: 0 0 14px rgba(0,255,136,0.35); }
-.special-btn.prabowo { border-color: #ff8c00; box-shadow: 0 0 14px rgba(255,140,0,0.35); }
-.special-btn.panic { border-color: var(--red); box-shadow: 0 0 14px rgba(255,32,85,0.35); }
+.special-btn.bailout { border-color: var(--green); box-shadow: 0 0 14px rgba(0,255,136,0.35); }
+.special-btn.hawkish { border-color: #00cfff; box-shadow: 0 0 14px rgba(0,207,255,0.35); }
+.special-btn.devalue { border-color: var(--red); box-shadow: 0 0 14px rgba(255,32,85,0.35); }
 
 /* ===== TOUCH CONTROLS ===== */
 .touch-controls {
@@ -230,17 +300,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 #screenFlash.active { opacity: 0.4; }
 
-/* ===== SUPPORT HIDDEN ===== */
-.support-hidden {
-  position: absolute; bottom: 8px; right: 10px;
-  opacity: 0.2; font-size: 10px; color: var(--text-dim);
-  cursor: pointer; z-index: 50; padding: 6px;
-  transition: opacity 0.3s; font-family: var(--font-display);
-  letter-spacing: 0.5px;
-}
-.support-hidden:hover { opacity: 1; color: var(--green); }
-
-/* ===== MODALS (base) ===== */
+/* ===== MODALS ===== */
 .modal {
   position: absolute; inset: 0;
   background: rgba(3, 3, 16, 0.97);
@@ -642,6 +702,8 @@ canvas { display: block; width: 100%; height: 100%; }
   .end-rate { font-size: 36px; }
   .end-card { padding: 22px 16px; }
   .touch-controls { display: flex !important; }
+  .wave-banner-title { font-size: 42px; }
+  .kill-streak { font-size: 28px; }
 }
 @media (max-height: 600px) {
   .special-moves { bottom: 60px; }

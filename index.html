@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#060612">
   <meta property="og:title" content="RUPIAH VS DOLLAR: THE FINAL BOSS">
-  <meta property="og:description" content="Defend the Rupiah! Survive 6 waves. Defeat The Fed! 🇮🇩">
+  <meta property="og:description" content="Defend the Rupiah! Survive 10 waves. Defeat The Fed & Trump! 🇮🇩">
   <title>RUPIAH VS DOLLAR: THE FINAL BOSS</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Bangers&display=swap" rel="stylesheet">
@@ -19,14 +19,27 @@
 
   <div id="uiLayer">
 
+    <!-- Live Counter -->
+    <div class="live-counter hidden" id="liveCounter">🔴 1,247 warriors online</div>
+
+    <!-- Wave Banner -->
+    <div id="waveBanner" class="wave-banner hidden">
+      <div class="wave-banner-title" id="waveBannerTitle">WAVE 1</div>
+      <div class="wave-banner-subtitle" id="waveBannerSubtitle">The Dollar Attacks</div>
+    </div>
+
+    <!-- Kill Streak -->
+    <div id="killStreakDisplay" class="kill-streak hidden">DOUBLE KILL!</div>
+
     <!-- HUD -->
     <div class="hud hidden" id="hud">
       <div class="hud-left">
         <div class="rate-display" id="rateDisplay">Rp <span id="rateValue">15,800</span></div>
-        <div class="wave-info">WAVE <span id="waveNum">1</span>/6</div>
+        <div class="wave-info">WAVE <span id="waveNum">1</span>/10</div>
       </div>
       <div class="hud-center">
         <div id="comboDisplay" class="combo-display hidden"></div>
+        <div id="critDisplay" class="crit-display hidden">CRIT!</div>
       </div>
       <div class="hud-right">
         <div class="stat-group">
@@ -48,20 +61,20 @@
 
     <!-- Special Moves -->
     <div id="specialMoves" class="special-moves hidden">
-      <button class="special-btn mbg" id="btnMbg" onclick="game.activateSpecial('mbg')" title="MBG Shield - 10s Invincibility">
-        <span class="special-icon">🍚</span>
-        <span class="special-name">MBG</span>
-        <div class="cooldown-overlay" id="cdMbg" style="height:0%"></div>
+      <button class="special-btn bailout" id="btnBailout" onclick="game.activateSpecial('bailout')" title="Bailout - 10s Invincibility">
+        <span class="special-icon">🛡️</span>
+        <span class="special-name">BAILOUT</span>
+        <div class="cooldown-overlay" id="cdBailout" style="height:0%"></div>
       </button>
-      <button class="special-btn prabowo" id="btnPrabowo" onclick="game.activateSpecial('prabowo')" title="Prabowo Roar - Freeze Enemies 5s">
-        <span class="special-icon">🦁</span>
-        <span class="special-name">ROAR</span>
-        <div class="cooldown-overlay" id="cdPrabowo" style="height:0%"></div>
+      <button class="special-btn hawkish" id="btnHawkish" onclick="game.activateSpecial('hawkish')" title="Hawkish - Freeze Enemies 5s">
+        <span class="special-icon">❄️</span>
+        <span class="special-name">HAWKISH</span>
+        <div class="cooldown-overlay" id="cdHawkish" style="height:0%"></div>
       </button>
-      <button class="special-btn panic" id="btnPanic" onclick="game.activateSpecial('panic')" title="Panic Sell - Nuke All, -50% HP">
+      <button class="special-btn devalue" id="btnDevalue" onclick="game.activateSpecial('devalue')" title="Devalue - Nuke All, -50% HP">
         <span class="special-icon">💥</span>
-        <span class="special-name">PANIC</span>
-        <div class="cooldown-overlay" id="cdPanic" style="height:0%"></div>
+        <span class="special-name">DEVALUE</span>
+        <div class="cooldown-overlay" id="cdDevalue" style="height:0%"></div>
       </button>
     </div>
 
@@ -81,12 +94,9 @@
     <div id="bossWarning" class="modal hidden boss-warning-modal">
       <div class="boss-alert-icon">⚠️</div>
       <div class="modal-title" style="color:#ff2055">BOSS INCOMING!</div>
-      <div class="boss-name">THE FED</div>
-      <p>The Federal Reserve is attacking!<br>Prepare your defenses!</p>
+      <div class="boss-name" id="bossName">THE FED</div>
+      <p id="bossDesc">The Federal Reserve is attacking!<br>Prepare your defenses!</p>
     </div>
-
-    <!-- Support Button (hidden) -->
-    <div class="support-hidden" id="donateBtn" onclick="showDonateModal()">💚 Support</div>
 
     <!-- ===== LOADING ===== -->
     <div id="loadingModal" class="modal hidden">
@@ -111,7 +121,7 @@
         <div class="brand-enemy">DOLLAR</div>
       </div>
       <div class="brand-tagline">THE FINAL BOSS</div>
-      <p class="brand-desc">The Dollar attacks every month.<br>Upgrade your Rupiah. Survive!</p>
+      <p class="brand-desc">The Dollar attacks every wave.<br>Upgrade your Rupiah. Survive 10 waves!</p>
 
       <div class="form-panel">
         <div class="form-tabs">
@@ -165,7 +175,7 @@
             <span id="playerName">Warrior</span>
           </div>
         </div>
-        <p class="menu-desc">💚 Start at Rp 15,800 — Don't let it hit 20,000!<br>Survive 6 waves. Defeat The Fed!</p>
+        <p class="menu-desc">💚 Start at Rp 15,800 — Don't let it hit 20,000!<br>Survive 10 waves. Defeat The Fed!</p>
         <div class="menu-buttons">
           <button class="btn btn-primary btn-large" onclick="game.start()">⚔️ START BATTLE</button>
           <button class="btn btn-warning" onclick="showHowToPlay()">📖 HOW TO PLAY</button>
@@ -191,7 +201,7 @@
         <div class="how-card">
           <div class="how-icon">👹</div>
           <h4>ENEMIES</h4>
-          <p>💵 $1 — Fast & weak<br>💶 $100 — Tough elite<br>🏦 The Fed — BOSS!<br>👻 Speculator — Invisible!</p>
+          <p>💵 $1 — Fast & weak<br>💶 $100 — Tough elite<br>👻 Speculator — Invisible!<br>🟠 Trump — 8-bit Mini-Boss</p>
         </div>
         <div class="how-card">
           <div class="how-icon">⚡</div>
@@ -201,7 +211,7 @@
         <div class="how-card">
           <div class="how-icon">🔥</div>
           <h4>SPECIALS</h4>
-          <p>🍚 MBG — 10s invincibility<br>🦁 Roar — Freeze 5s<br>💥 Panic — Nuke all, -50% HP</p>
+          <p>🛡️ Bailout — 10s invincibility<br>❄️ Hawkish — Freeze 5s<br>💥 Devalue — Nuke all, -50% HP</p>
         </div>
       </div>
       <button class="btn btn-primary" onclick="hideHowToPlay()">LET'S GO! 🚀</button>
@@ -218,7 +228,7 @@
         <div class="upgrade-card" id="card-laser" onclick="game.buyUpgrade('laser')">
           <div class="upgrade-icon">🔫</div>
           <h3>BI RATE LASER</h3>
-          <p>Damage &amp; fire rate</p>
+          <p>Damage & fire rate</p>
           <div class="cost" id="costLaser">500 PTS</div>
           <div class="upgrade-level" id="lvlLaser">LV 0</div>
         </div>
@@ -232,7 +242,7 @@
         <div class="upgrade-card" id="card-export" onclick="game.buyUpgrade('export')">
           <div class="upgrade-icon">☕</div>
           <h3>EXPORT ARMY</h3>
-          <p>Coffee &amp; CPO allies</p>
+          <p>Coffee & CPO allies</p>
           <div class="cost" id="costExport">800 PTS</div>
           <div class="upgrade-level" id="lvlExport">LV 0</div>
         </div>
